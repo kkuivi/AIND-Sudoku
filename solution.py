@@ -69,7 +69,6 @@ def generateTwinMaps(rowTwins, colTwins, squareUnitTwins, values):
         unitValues = values.get(unit)
 
         if(len(unitValues) == 2):
-            print("Has two: " + unit)
             for neighbor in neighbors:
                 neighborValue = values.get(neighbor)
                 if(unitValues == neighborValue):
@@ -129,19 +128,12 @@ def removeValuesWithNoTwins(twinArr):
     remove = []
     for key, valueMap in twinArr.items():
      if (len(valueMap) != 2):
-        print('Set does not have 2: ' + str(key))
         remove.append(key)
     
     printDict(twinArr)
 
     for key in remove:
-        print('Delete key: ' + str(key))
         del twinArr[key]
-        print('New Dict After Delete: ' + str(key))
-        printDict(twinArr)
-
-    print('New Dict After Remove Two')
-    printDict(twinArr)
 
 def getSquareUnitNumber(unit):
 
