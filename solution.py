@@ -2,20 +2,18 @@
 from utils import *
 import utils
 
+from collections import defaultdict
+
 row_units = [cross(r, cols) for r in rows]
 column_units = [cross(rows, c) for c in cols]
 square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-unitlist = row_units + column_units + square_units
-
-# TODO: Update the unit list to add the new diagonal units
-unitlist[0] = unitlist[0] + ['D4', 'E5', 'F6', 'G7', 'H8', 'I9']
-unitlist[2] = unitlist[2] + ['D6', 'E5', 'F4', 'G3', 'H2', 'I1']
-unitlist[4] = unitlist[4] + ['A1', 'B2', 'C3', 'G7', 'H8', 'I9', 'A9', 'B8', 'C7', 'G3', 'H2', 'I1']
-unitlist[6] = unitlist[6] + ['F4', 'E5', 'D6', 'C7', 'B8', 'A9']
-unitlist[8] = unitlist[8] + ['F6', 'E5', 'D4', 'C3', 'B2', 'A1']
+diagonal_units = [['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8', 'I9'],
+                ['A9',  'B8', 'C7', 'D6', 'E5', 'F4', 'G3', 'H2', 'I1']]
+unitlist = row_units + column_units + diagonal_units + square_units
 
 units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
 peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
+
 
 def naked_twins(values):
     """Eliminate values using the naked twins strategy.
@@ -44,135 +42,97 @@ def naked_twins(values):
     and because it is simpler (since the reduce_puzzle function already calls this
     strategy repeatedly).
     """
-    rowTwins = {}
-    colTwins = {}
-    squareUnitTwins = {}
 
-    generateTwinMaps(rowTwins, colTwins, squareUnitTwins, values)
+    all_pairs = []
 
-    removeValuesWithNoTwins(rowTwins)
-    removeValuesWithNoTwins(colTwins)
-    removeValuesWithNoTwins(squareUnitTwins)
+    for key, val in values.items():
+        if(len(val) == 2):
+            all_pairs.append(key)
 
-    removeNakedTwins(rowTwins, row_units, values)
-    removeNakedTwins(colTwins, column_units, values)
-    removeNakedTwins(squareUnitTwins, square_units, values)
+    row_twins = defaultdict(list)
+    col_twins = defaultdict(list)
+    square_unit_twins = defaultdict(list)
 
-def printDict(twinDict):
-    for x in twinDict:
-        print (x)
-        for y in twinDict[x]:
-            print (y,':',twinDict[x][y])
+    for i in range(len(all_pairs)):
+        unit = all_pairs[i]
+        for j in range(i+1, len(all_pairs)):
+            other_unit = all_pairs[j]
 
-def generateTwinMaps(rowTwins, colTwins, squareUnitTwins, values):
-    for unit, neighbors in peers.items():
-        unitValues = values.get(unit)
+            unit_value = values[unit]
+            other_unit_value = values[other_unit]
 
-        if(len(unitValues) == 2):
-            for neighbor in neighbors:
-                neighborValue = values.get(neighbor)
-                if(unitValues == neighborValue):
-                    
-                    unitRowArrIndex = getUnitRowNumber(unit)
-                    neighborRowArrIndex = getUnitRowNumber(neighbor)
-                    if(unitRowArrIndex == neighborRowArrIndex):
-                        putTwinsInArr(unit, neighbor, unitValues, unitRowArrIndex, rowTwins)
+            if(unit_value == other_unit_value):
 
-                    unitColArrIndex = getUnitColNumber(unit)
-                    neighborColArrIndex = getUnitColNumber(unit)
-                    if(unitColArrIndex == neighborColArrIndex):
-                        putTwinsInArr(unit, neighbor, unitValues, unitColArrIndex, colTwins)
+                if(same_row(unit, other_unit)):
+                    row_number = get_index_number(unit, row_units)
+                    row_twins[row_number].append([unit, other_unit])
 
-                    unitSquareArrIndex = getSquareUnitNumber(unit)
-                    neighborSquareArrIndex = getSquareUnitNumber(unit)
-                    if(unitSquareArrIndex == neighborSquareArrIndex):
-                        putTwinsInArr(unit, neighbor, unitValues, unitSquareArrIndex, squareUnitTwins)
+                elif(same_col(unit, other_unit)):
+                    col_number = get_index_number(unit, column_units)
+                    col_twins[col_number].append([unit, other_unit])
 
-def removeNakedTwins(twinArr, unitArr, values):
-    for arrNumber, twinValuesMap in twinArr.items():
+                if(same_square_unit(unit, other_unit)):
+                    square_unit_number = get_index_number(unit, square_units)
+                    square_unit_twins[square_unit_number].append([unit, other_unit])
 
-        for twinValue, twinSet in twinValuesMap.items():
-            val1 = twinValue[0]
-            val2 = twinValue[1]
+    removeTwinValues(row_twins, row_units, values)
+    removeTwinValues(col_twins, column_units, values)
+    removeTwinValues(square_unit_twins, square_units, values)
 
-            index1 = list(twinSet)[0]
-            index2 = list(twinSet)[1]
+    return values
 
-            for unit in unitArr[arrNumber]:
-                if(len(twinValue) == 2 and unit != index1 and unit != index2):
-                    unitValue = values.get(unit)
-                    unitValue = unitValue.replace(val1, "")
-                    unitValue = unitValue.replace(val2, "")
-                    values[unit] = unitValue    
+def removeTwinValues(unit_twin_map, unit_arr, values):
+
+    for index, twin_sets in unit_twin_map.items():
+
+        for twin_set in twin_sets:
+            twin1 = twin_set[0]
+            twin2 = twin_set[1]
+
+            twin_value = values[twin1]
+            for unit in unit_arr[index]:
+                if((unit != twin1) and (unit != twin2)):
+                    unit_value = values[unit]
+                    unit_value = unit_value.replace(twin_value[0], "")
+                    unit_value = unit_value.replace(twin_value[1], "")
+                    values[unit] = unit_value
 
 
-def putTwinsInArr(unit, neighbor, value, arrIndex, twinsArr):
-
-    if arrIndex not in twinsArr:
-        twinsArr[arrIndex] = {}
-        
-    twinValuesMap = twinsArr[arrIndex]
-    twinValuesSet = twinValuesMap.get(value)
-
-    if not twinValuesSet:
-        twins = set()
-        twins.add(unit)
-        twins.add(neighbor)
-        twinValuesMap[value] = twins
-    else:
-        twinValuesSet.add(unit)
-        twinValuesSet.add(neighbor)
-
-def removeValuesWithNoTwins(twinArr):
-
-    remove = []
-    for key, valueMap in twinArr.items():
-     if (len(valueMap) != 2):
-        remove.append(key)
+def same_row(unit, other_unit):
+    unit_index_number = get_index_number(unit, row_units)
+    other_unit_index_number = get_index_number(other_unit, row_units)
     
-    printDict(twinArr)
+    if(unit_index_number == -1 or other_unit_index_number == -1):
+        return False
 
-    for key in remove:
-        del twinArr[key]
+    return unit_index_number == other_unit_index_number
 
-def getSquareUnitNumber(unit):
+def same_col(unit, other_unit):
+    unit_index_number = get_index_number(unit,column_units)
+    other_unit_index_number = get_index_number(other_unit,column_units)
 
-    row = unit[0]
-    col = int(unit[1])
+    if(unit_index_number == -1 or other_unit_index_number == -1):
+        return False
 
-    if(row >= 'A' and row <= 'C'):
-        if(col >= 1 and col <= 3):
-            return 1
-        elif(col >= 4 and col <= 6):
-            return 2
-        elif(col >= 7 and col <= 9):
-            return 3
+    return unit_index_number == other_unit_index_number 
 
-    elif(row >= 'D' and row <= 'F'):
-        if(col >= 1 and col <= 3):
-            return 4
-        elif(col >= 4 and col <= 6):
-            return 5
-        elif(col >= 7 and col <= 9):
-            return 6
+def same_square_unit(unit, other_unit):
+    unit_index_number = get_index_number(unit,square_units)
+    other_unit_index_number = get_index_number(other_unit,square_units)
 
-    elif(row >= 'G' and row <= 'I'):
-        if(col >= 1 and col <= 3):
-            return 7
-        elif(col >= 4 and col <= 6):
-            return 8
-        elif(col >= 7 and col <= 9):
-            return 9
+    if(unit_index_number == -1 or other_unit_index_number == -1):
+        return False;
 
-def getUnitRowNumber(unit):
-    rowLetter = unit[0]
-    index = ord(rowLetter) - 65
-    return index
+    return unit_index_number == other_unit_index_number 
 
-def getUnitColNumber(unit):
-    colNumber = unit[1]
-    index = int(colNumber)
-    return index-1
+def get_index_number(unit, unit_arr):
+
+    for index in range(len(unit_arr)):
+        list_of_units = unit_arr[index]
+        if unit in list_of_units:
+            return index
+
+    return -1
 
 def eliminate(values):
     """Apply the eliminate strategy to a Sudoku puzzle
@@ -288,15 +248,13 @@ def search(values):
     """
     reduce_puzzle_result = reduce_puzzle(values)
 
-    num_solved_boxes = len([box for box, val in values.items() if(len(val) == 1)])
     if(reduce_puzzle_result == False):
         return False
-    elif(num_solved_boxes == len(values)):
+    elif(is_puzzle_solved(values)):
         return reduce_puzzle_result
 
     boxWithMinPossibleSolutions = findMinUnSolvedBox(values)
     boardVersions = getDiffBoardVersions(values, boxWithMinPossibleSolutions)
-
     for board in boardVersions:
         search_result = search(board)
 
@@ -305,13 +263,26 @@ def search(values):
 
     return False
 
+def is_puzzle_solved(values):
+
+    for box, val in values.items():
+
+        if((len(val) == 1) and (int(val) >= 1 and int(val) <= 9)):
+            for peer in peers[box]:
+                peer_value = values[peer]
+                if(val in peer_value):
+                    return False
+        else:
+            return False
+
+    return True                 
+
 def findMinUnSolvedBox(values):
 
     minNumPossibleSolutions = 10
     minBox = ""
 
     for box, val in values.items():
-
         if(len(val) > 1 and len(val) < minNumPossibleSolutions):
             minNumPossibleSolutions = len(val)
             minBox = box
@@ -320,15 +291,16 @@ def findMinUnSolvedBox(values):
 
 def getDiffBoardVersions(values, boxWithPossibleSolutions):
 
-    boardVersions = []
+    if(len(boxWithPossibleSolutions) == 0):
+        return []
 
+    boardVersions = []
     for val in values.get(boxWithPossibleSolutions):
         newBoard = values.copy()
         newBoard[boxWithPossibleSolutions] = val
         boardVersions.append(newBoard)
 
     return boardVersions
-
 
 def solve(grid):
     """Find the solution to a Sudoku puzzle using search and constraint propagation
